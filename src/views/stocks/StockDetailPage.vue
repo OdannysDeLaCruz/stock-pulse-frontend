@@ -4,43 +4,55 @@ import LWChart from '../../components/charts/LWChart.vue';
 import type { AreaData, ChartOptions, DeepPartial } from 'lightweight-charts';
 import { formatDate, transformDataToLW } from '@/utils';
 import { useStocksStore } from '@/stores/stocks';
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import type { Stock } from '@/types';
 
 const myChart = ref();
 const chartOptions = ref<DeepPartial<ChartOptions>>({})
 const stocksStore = useStocksStore()
 const route = useRoute()
+const router = useRouter()
 const stock = ref<Stock | null>(null)
 const stockTicker = ref()
 
 // Initial data
-const data = ref<AreaData[]>([
-  { time: formatDate("2025-03-11T01:35:08.180590815Z"), value: 120 },
-  { time: formatDate("2025-03-11T01:35:10.359020470Z"), value: 125 },
-  { time: formatDate("2025-03-11T01:35:12.741095661Z"), value: 130 },
-  { time: formatDate("2025-03-11T01:35:14.278369404Z"), value: 128 },
-  { time: formatDate("2025-03-11T01:35:16.123590815Z"), value: 132 },
-  { time: formatDate("2025-03-11T01:35:18.180590815Z"), value: 135 },
-  { time: formatDate("2025-03-11T01:35:20.359020470Z"), value: 137 },
-  { time: formatDate("2025-03-11T01:35:22.741095661Z"), value: 120 },
-  { time: formatDate("2025-03-11T01:35:24.278369404Z"), value: 150 },
-  { time: formatDate("2025-03-11T01:35:26.123590815Z"), value: 160 },
-])
+const defaultPriceHistory = [
+  { time: formatDate("2025-03-17T02:57:34.335378Z"), value: 50 },
+  { time: formatDate("2025-03-17T02:57:40.335378Z"), value: 70 },
+]
+const data = ref<AreaData[]>(defaultPriceHistory)
 
-onMounted(() => {
+onMounted(async () => {
+  // debugger
   stockTicker.value = route.params.ticker
   stocksStore.subscribeToStock(stockTicker.value)
 
   const existingStock = stocksStore.stocks.find((stock: Stock) => stock.ticker === stockTicker.value)
   if (existingStock) {
     stock.value = existingStock
+    // data.value = stock.value?.price_history.length ? transformDataToLW(stock.value?.price_history) : defaultPriceHistory
   } else {
-    const data = stocksStore.fetchStockBySymbol(stockTicker.value)
-    console.log('DATA', data)
+    const newStock = await stocksStore.fetchStockBySymbol(stockTicker.value)
+
+    if (newStock) {
+      stocksStore.setStock(newStock)
+      const addRecent = stocksStore.stocks.find((stock: Stock) => stock.ticker === newStock.ticker)
+
+      if (addRecent) {
+        stock.value = addRecent
+        // data.value = stock.value?.price_history.length ? transformDataToLW(stock.value?.price_history) : defaultPriceHistory
+      }
+
+      // Redirect to home if stock not found
+      if (!stock.value) {
+        router.push({ name: 'stocks' })
+      }
+    }
   }
 
-  data.value = transformDataToLW(stock.value?.price_history || [])
+  console.log(data.value)
+
+
 })
 
 onUnmounted(() => {
